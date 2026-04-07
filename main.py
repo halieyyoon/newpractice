@@ -57,10 +57,10 @@ def init_game():
     """게임 초기 상태를 반환한다."""
     player = {
         "hp":     10,        # 초기 HP (배고픈 상태)
-        "money":  50000,     # 체크카드 계좌 잔액 (5만원)
-        "pos":    list(START_POS),  # [row, col]
-        "bag":    [],        # 가방 (아이템 리스트)
-        "hunger": True,      # 배고프다
+        "money":  50000,     # 만원 단위 
+        "pos":    list(START_POS), 
+        "bag":    [],       
+        "hunger": True,      
     }
     env = {
         "time":       11,    # 현재 시각 (11시)
@@ -130,7 +130,7 @@ def show_status(player, env):
  
  
 # ─────────────────────────────────────────────
-#  인벤토리 (가방) 시스템
+#  inventory (가방) sys
 # ─────────────────────────────────────────────
 def show_bag(player):
     """'가방' 명령: 가방 내 아이템 목록을 출력한다."""
@@ -251,7 +251,7 @@ def save_game(player, env, input_log):
     try:
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(save_data, f, ensure_ascii=False, indent=2)
-        print(f"💾 저장 완료 → '{filename}'")
+        print(f"저장 완료 → '{filename}'")
     except Exception as e:
         print(f"저장 실패: {e}")
  
@@ -270,7 +270,7 @@ def load_game():
     save_files = sorted(glob.glob(f"*{SAVE_EXT}"))
  
     print("─" * 40)
-    print("  📂 불러오기")
+    print("불러오기")
     if save_files:
         print("  현재 폴더의 저장 파일:")
         for i, f in enumerate(save_files, 1):
@@ -309,7 +309,7 @@ def load_game():
         player    = data["player"]
         env       = data["env"]
         input_log = data["input_log"]
-        print(f"✅ 불러오기 완료! (저장 시각: {data.get('saved_at', '알 수 없음')})")
+        print(f"불러오기 완료! (저장 시각: {data.get('saved_at', '알 수 없음')})")
         print(f"   위치: {current_location(player)}  |  HP: {player['hp']}  |  잔액: {player['money']:,}원")
         return player, env, input_log
     except Exception as e:
