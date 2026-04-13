@@ -192,7 +192,7 @@ def interact_store(player):
     아이템을 구매해 가방에 넣는다.
     """
     print("=" * 40)
-    print("  🏪 학생회관 편의점에 들어왔다.")
+    print(" 학생회관 편의점에 들어왔다.")
     print("  구매할 물건을 고르세요:")
     for i, item in enumerate(STORE_ITEMS, 1):
         print(f"  {i}. {item['name']}  - {item['price']:,}원  (HP +{item['hp_effect']})")
@@ -223,9 +223,9 @@ def try_interact(player):
     if player["pos"] == STORE_POS:   # 학생회관
         interact_store(player)
     elif loc == "이윤재관":
-        print("🎓 이윤재관에 도착했다! 511호 수업이 기다리고 있어.")
+        print("이윤재관에 도착했다! 511호 수업이 기다리고 있어.")
     elif loc == "스타벅스":
-        print("☕ 스타벅스다. 아직 구매 기능은 없어.")
+        print("스타벅스다. 아직 구매 기능은 없어.")
     # 다른 장소는 확장 가능
  
  
