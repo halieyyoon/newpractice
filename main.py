@@ -404,7 +404,7 @@ def process_command(cmd, player, env, input_log):
 def main():
     """메인 게임 루프."""
     print("=" * 50)
-    print("   🎓 연세대 캠퍼스 어드벤처")
+    print("  연세대 캠퍼스 어드벤처")
     print("   송도 생활을 마치고 신촌에 처음 도착했다.")
     print("   현재 시각은 11시. 1시 수업은 이윤재관 511호.")
     print("   배가 고프다...")
