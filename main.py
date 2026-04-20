@@ -41,13 +41,23 @@ STORE_POS = [2, 2]
  
 # 학생회관 판매 아이템
 STORE_ITEMS = [
-    {"name": "두쫀쿠",   "price": 5000,  "hp_effect": 25},
-    {"name": "카페라떼", "price": 2500,  "hp_effect": 25},
+    {"name": "두쫀쿠",   "price": 5000,  "hp_effect": 10},
+    {"name": "카페라떼", "price": 3000,  "hp_effect": 5},
 ]
- 
+'''
+#스타벅스, ABMRC 판매 아이템
+STORE_ITEMS = [
+    {"name": "두쫀쿠", "price": 4000, "hp_effect": 10},
+    {"name": "카페라떼", "price": 2000, "hp_effect": 5},
+]
+'''
+'''#중앙도서관, 백양관, 대강당, 백주년기념관 - 60
+STORE_ITEMS = [
+    {"name": "두쫀쿠", "price": 6000, "hp_effect": 10}, 
+    {"name" : "카페라떼", "price": 3000, "hp_effect": 5}
+]'''
 # 저장 파일 확장자
 SAVE_EXT = ".sav.json"
- 
  
 # ─────────────────────────────────────────────
 #  게임 상태 초기화
@@ -348,6 +358,8 @@ def process_command(cmd, player, env, input_log):
  
     # ── 이동 ──
     if action in DIRECTIONS:
+  #      player.move(direction)
+  #      self.x += direction
         moved = move(player, action)
         if moved:
             try_interact(player)
