@@ -1,29 +1,96 @@
-
-"""
-=============================================================
-  연세대 캠퍼스 텍스트 어드벤처 게임
-=============================================================
-실행 방법:
-    python run.py main.py       <- 입출력 자동 번호 기록
-    python main.py              <- 그냥 실행
-=============================================================
-"""
-
 import json
 import os
 import glob
 import pickle
 from datetime import datetime
+import sys
+import io
+
+# ────────────────────────────────────────
+# 로깅 시스템
+# ────────────────────────────────────────
+class SimpleLogger:
+    def __init__(self, input_file="player_input.txt", output_file="game_output.txt"):
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        self.input_file = os.path.join(base_dir, input_file)
+        self.output_file = os.path.join(base_dir, output_file)
+        self.counter = 0
+        
+        open(self.input_file, "w", encoding="utf-8").close()
+        open(self.output_file, "w", encoding="utf-8").close()
+
+    def next_num(self):
+        self.counter += 1
+        return self.counter
+
+    def log_input(self, text):
+        num = self.next_num()
+        line = f"[{num}] 입력: {text}"
+        with open(self.input_file, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+        with open(self.output_file, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+
+    def log_output(self, text):
+        if text.strip():
+            num = self.next_num()
+            line = f"[{num}] {text}"
+            with open(self.output_file, "a", encoding="utf-8") as f:
+                f.write(line + "\n")
+
+logger = SimpleLogger()
+
+class LoggedStdout(io.TextIOBase):
+    def __init__(self, original):
+        self.original = original
+        self._pending = ""
+
+    def write(self, text):
+        self.original.write(text)
+        self.original.flush()
+        self._pending += text
+        while "\n" in self._pending:
+            line, self._pending = self._pending.split("\n", 1)
+            logger.log_output(line)
+        return len(text)
+
+    def flush(self):
+        self.original.flush()
+
+    def fileno(self):
+        return self.original.fileno()
+
+    @property
+    def encoding(self):
+        return self.original.encoding
+
+class LoggedStdin(io.TextIOBase):
+    def __init__(self, original):
+        self.original = original
+
+    def readline(self):
+        line = self.original.readline()
+        text = line.rstrip("\n")
+        if text.strip():
+            logger.log_input(text)
+        return line
+
+    def fileno(self):
+        return self.original.fileno()
+
+    @property
+    def encoding(self):
+        return self.original.encoding
 
 
 MAP = [
-    ["종합관",        "본관",    "경영관",    "노천극장",                  "새천년관",    "이윤재관"],
-    ["백양관",        "백양로5", "대강당",      "음악관",                    "알렌관",      "ABMRC"],
-    ["중앙도서관",    "독수리상","학생회관",    "루스채플",                  "재활병원",    "치과대학"],
-    ["체육관",        "백양로3", "공터2",       "광혜원",                    "어린이병원",  "세브란스"],
-    ["공학관",        "백양로2", "백주년기념관","안과병원",                  "제중관",      "None"],
-    ["공학원",        "백양로1", "공터1",       "암병원",                    "의과대학",    "None"],
-    ["연대앞 버스정류장","정문", "스타벅스",    "세브란스병원 버스정류장", None,         None],
+    ["종합관",        "본관",    "경영관",    "노천극장",                   "새천년관",    "이윤재관"],
+    ["백양관",        "백양로5", "대강당",      "음악관",                     "알렌관",      "ABMRC"],
+    ["중앙도서관",    "독수리상","학생회관",    "루스채플",                   "재활병원",    "치과대학"],
+    ["체육관",        "백양로3", "공터2",       "광혜원",                     "어린이병원",  "세브란스"],
+    ["공학관",        "백양로2", "백주년기념관","안과병원",                   "제중관",      "None"],
+    ["공학원",        "백양로1", "공터1",       "암병원",                     "의과대학",    "None"],
+    ["연대앞 버스정류장","정문", "스타벅스",    "세브란스병원 버스정류장", "None",        "None"],
 ]
 
 ROWS = len(MAP)
@@ -41,15 +108,12 @@ SAVE_EXT    = ".sav.json"
 EVENTS_FILE = "events.bin"
 
 DIFFICULTY_HP = {
-    "쉬움":   0.5,
     "보통":   1.0,
     "어려움": 2.0,
 }
 
-
 def is_valid_cell(r, c):
     return 0 <= r < ROWS and 0 <= c < COLS and MAP[r][c] is not None
-
 
 def load_events():
     default = {
@@ -64,14 +128,12 @@ def load_events():
             "교내 위생사건 수사": "대강당",
         }
     }
-    # [수정된 부분] events.pkl 파일이 존재하는지 확인하고, 있을 경우 파일의 데이터를 읽어옵니다.
     if not os.path.exists(EVENTS_FILE):
         return default
     try:
         with open(EVENTS_FILE, "rb") as f:
             data = pickle.load(f)
         
-        # 'events'와 'answers' 키가 있는지 확인하고 기본값으로 보완
         if "events" not in data:
             data["events"] = {}
         if "answers" not in data:
@@ -124,7 +186,7 @@ class Player:
         self.pos = [nr, nc]
         hp_loss = DIFFICULTY_HP[difficulty]
         self.hp -= hp_loss
-        print(f"[{self.location()}] 에 도착했다. (HP -{hp_loss} -> HP {self.hp})")
+        print(f"{self.location()}로 이동했다.")
         return True
 
     def location(self):
@@ -137,13 +199,10 @@ class Player:
         for dname, (dr, dc) in DIRECTIONS.items():
             nr, nc = r + dr, c + dc
             neighbors[dname] = MAP[nr][nc] if is_valid_cell(nr, nc) else "막힘"
-        print("─" * 35)
-        print(f"현재 위치   : {self.location()}")
-        print(f"현재 시각   : {env['time']}시")
-        print(f"계좌 잔액   : {self.money:,}원")
-        print(f"HP          : {self.hp}")
-        print(f"동서남북    : {neighbors['동']}, {neighbors['서']}, {neighbors['남']}, {neighbors['북']}")
-        print("─" * 35)
+        print(f"계좌의 잔액 = {self.money:,}원")
+        print(f"HP = {self.hp}")
+        print(f"현재위치 = {self.location()}")
+        print(f"동서남북 = {neighbors['동']}, {neighbors['서']}, {neighbors['남']}, {neighbors['북']}")
 
     def add_to_bag(self, item_template):
         for it in self.bag:
@@ -167,12 +226,10 @@ class Player:
         if not self.bag:
             print("가방이 비어있어.")
             return False
-        print("─" * 30)
         print("가방 속 물건:")
         for i, item in enumerate(self.bag, 1):
             qty = item.get("qty", 1)
-            print(f"  {i}. {item['name']} x{qty}  (HP +{item['hp_effect']})")
-        print("─" * 30)
+            print(f" {i}) {item['name']}: {item['hp_effect']}만큼 증가한다.")
         return True
 
     def use_item(self, choice):
@@ -198,7 +255,7 @@ class Player:
         self.hp += target["hp_effect"]
         name = target["name"]
         self.remove_from_bag(name, 1)
-        print(f"'{name}' 을 먹었다! HP +{target['hp_effect']} -> HP {self.hp}")
+        print(f"{name}를 먹었습니다. HP={self.hp}")
         if self.hp > 10:
             self.hunger = False
 
@@ -271,72 +328,72 @@ class Place:
 
     def print_event(self):
         if self.event_info:
-            print(f"[사건] {self.event_info}")
+            print(f"[{self.event_info}]")
 
     def interact_buy(self, player):
         items = self.BUY_CATALOG.get(self.name)
         if not items:
             print("여기선 살 수 있는 게 없어.")
             return
-        print("=" * 40)
-        print(f" [{self.name}] 구매 메뉴")
-        for i, item in enumerate(items, 1):
-            print(f"  {i}. {item['name']}  - {item['price']:,}원  (HP +{item['hp_effect']})")
-        print("  0. 종료")
-        print("=" * 40)
+            
+        buy_msg = f"1) 두쫀쿠: {items[0]['price']}원, HP가 {items[0]['hp_effect']}만큼 증가한다.\n" \
+                  f"2) {items[1]['name']}: {items[1]['price']}원, HP가 {items[1]['hp_effect']}만큼 증가한다.\n" \
+                  f"3) 종료"
+        print(buy_msg)
+        
         while True:
-            choice = input("구매 > ").strip()
-            if choice == "0" or choice == "종료":
+            choice = input("입력: ").strip()
+            if choice == "3" or choice == "종료":
                 print("구매를 종료합니다.")
                 break
+            
             item = None
-            if choice.isdigit() and 1 <= int(choice) <= len(items):
-                item = items[int(choice) - 1]
-            else:
-                for it in items:
-                    if it["name"] == choice:
-                        item = it
-                        break
+            if choice == "1":
+                item = items[0]
+            elif choice == "2":
+                item = items[1]
+                
             if item is None:
-                print(f"0~{len(items)} 번호 또는 이름으로 선택해.")
+                print("1~3번 중에서 선택해.")
                 continue
+                
             if player.money < item["price"]:
-                print(f"{item['name']} 구매를 실패했다. 계좌 잔액이 부족하다. (잔액: {player.money:,}원)")
+                print(f"{item['name']} 구매를 실패했다. 계좌 잔액이 부족하다.")
             else:
                 player.money -= item["price"]
                 player.add_to_bag(item)
-                print(f"'{item['name']}' 을 구매해서 가방에 넣었다. 계좌 잔액 = {player.money:,}원")
+                print(f"{item['name']}를 구매해서 가방에 넣었다. 계좌 잔액 = {player.money}원")
 
     def interact_sell(self, player):
         prices = self.sell_prices()
         if not prices:
             print("여기선 팔 수 있는 곳이 아니야.")
             return
+            
         while True:
             sellable = [it for it in player.bag if it["name"] in prices]
             if not sellable:
                 print("팔 것이 없어서 종료합니다.")
                 break
-            print("─" * 40)
-            print("무엇을 판매하시겠습니까?")
+                
+            sell_msg = "무엇을 판매하시겠습니까?\n"
             for i, item in enumerate(sellable, 1):
-                p   = prices[item["name"]]
-                qty = item.get("qty", 1)
-                print(f"  {i}. {item['name']} x{qty}  ->  {p:,}원")
-            print("  0. 종료")
-            print("─" * 40)
-            choice = input("판매 > ").strip()
-            if choice == "0":
+                sell_msg += f" {i}) {item['name']} x1\n"
+            sell_msg += f" {len(sellable)+1}) 종료"
+            print(sell_msg)
+            
+            choice = input("입력: ").strip()
+            if choice == str(len(sellable) + 1):
                 print("판매를 종료합니다.")
                 break
             elif choice.isdigit() and 1 <= int(choice) <= len(sellable):
-                item   = sellable[int(choice) - 1]
+                item = sellable[int(choice) - 1]
                 earned = prices[item["name"]]
                 player.money += earned
                 player.remove_from_bag(item["name"], 1)
-                print(f"'{item['name']}' 을 판매해서 {earned:,}원을 벌었다. 계좌 잔액 = {player.money:,}원")
+                print(f"{item['name']}를 판매해서 {earned}원을 벌었다. 계좌 잔액 = {player.money}원")
             else:
-                print(f"0~{len(sellable)} 중에서 선택해.")
+                print(f"1~{len(sellable)+1} 중에서 선택해.")
 
     def interact_quest(self, player, quests):
         if self.name == "정문":
@@ -542,7 +599,7 @@ def load_game():
 
 
 def print_help():
-    print("─" * 40)
+    print("────────────────────────────────────────")
     print("명령어 목록:")
     print("  북 / 남 / 동 / 서  -> 이동")
     print("  상태               -> HP, 잔액, 위치, 인접칸 확인")
@@ -555,10 +612,10 @@ def print_help():
     print("  상호작용           -> 가능한 상호작용 목록")
     print("  저장               -> 게임 저장")
     print("  불러오기           -> 저장된 게임 불러오기")
-    print("  난이도             -> 난이도 확인/변경")
+    print("  난이도             -> 확인/변경")
     print("  도움말             -> 이 화면")
     print("  종료               -> 게임 종료")
-    print("─" * 40)
+    print("────────────────────────────────────────")
 
 
 def process_command(cmd, player, env, quests, places, input_log):
@@ -653,53 +710,82 @@ def process_command(cmd, player, env, quests, places, input_log):
 
 
 def main():
-    print("=" * 50)
-    print("  연세대 캠퍼스 어드벤처")
-    print("   송도 생활을 마치고 신촌에 처음 도착했다.")
-    print("   현재 시각은 11시. 1시 수업은 이윤재관 511호.")
-    print("   배가 고프다...")
-    print("=" * 50)
-    print("시작 위치: 연대앞 버스정류장")
-    print_help()
+    _original_stdout = sys.stdout
+    _original_stdin = sys.stdin
+    sys.stdout = LoggedStdout(_original_stdout)
+    sys.stdin = LoggedStdin(_original_stdin)
 
-    events_data = load_events()
-    places = {
-        name: Place(name, events_data)
-        for row in MAP for name in row if name is not None
-    }
+    try:
+        print("==================================================")
+        print("  연세대 캠퍼스 어드벤처")
+        print("   송도 생활을 마치고 신촌에 처음 도착했다.")
+        print("   현재 시각은 11시. 1시 수업은 이윤재관 511호.")
+        print("   배가 고프다...")
+        print("==================================================")
+        print("시작 위치: 연대앞 버스정류장")
+        print_help()
 
-    player    = Player()
-    env       = {"time": 11, "difficulty": "보통"}
-    quests    = []
-    input_log = []
+        difficulty_set = False
 
-    while True:
-        loc = player.location()
-        try:
-            cmd = input(f"\n[{loc}] > ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\n게임을 종료합니다.")
-            break
+        events_data = load_events()
+        places = {
+            name: Place(name, events_data)
+            for row in MAP for name in row if name is not None
+        }
 
-        if not cmd:
-            continue
+        player    = Player()
+        env       = {"time": 11, "difficulty": "보통"}
+        quests    = []
+        input_log = []
 
-        input_log.append(cmd)
-        result = process_command(cmd, player, env, quests, places, input_log)
+        while True:
+            loc = player.location()
+            try:
+                cmd = input(f"\n[{loc}] > ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print("\n게임을 종료합니다.")
+                break
 
-        if result == "quit":
-            break
-        elif isinstance(result, tuple) and result[0] == "load":
-            _, (player, env, quests, loaded_log) = result
-            input_log = loaded_log
-            places = {
-                name: Place(name, events_data)
-                for row in MAP for name in row if name is not None
-            }
-            print(f"게임 재개! 현재 위치: {player.location()}")
+            if not cmd:
+                continue
 
-        if player.hp <= 0:
-            print("HP가 0 이하야! 너무 배고파서 쓰러질 것 같아. 무언가를 먹어야 해!")
+            if not difficulty_set:
+                print("\n난이도를 선택하세요")
+                while True:
+                    choice = input("1. 보통\n2. 어려움\n입력 (1 또는 2) > ").strip()
+                    if choice == "1":
+                        env["difficulty"] = "보통"
+                        difficulty_set = True
+                        break
+                    elif choice == "2":
+                        env["difficulty"] = "어려움"
+                        difficulty_set = True
+                        break
+                    else:
+                        print("올바른 번호(1 또는 2)를 입력해주세요.")
+                print(f"\n난이도가 '{env['difficulty']}'로 설정되었습니다. 게임을 시작합니다.")
+                continue
+
+            input_log.append(cmd)
+            result = process_command(cmd, player, env, quests, places, input_log)
+
+            if result == "quit":
+                break
+            elif isinstance(result, tuple) and result[0] == "load":
+                _, (player, env, quests, loaded_log) = result
+                input_log = loaded_log
+                places = {
+                    name: Place(name, events_data)
+                    for row in MAP for name in row if name is not None
+                }
+                print(f"게임 재개! 현재 위치: {player.location()}")
+
+            if player.hp <= 0:
+                print("HP가 0 이하야! 너무 배고파서 쓰러질 것 같아. 무언가를 먹어야 해!")
+    finally:
+        sys.stdout = _original_stdout
+        sys.stdin = _original_stdin
+        print(f"\n[작업 완료] 입력 기록 완료")
 
 
 if __name__ == "__main__":
