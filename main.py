@@ -93,6 +93,8 @@ def is_valid_cell(r, c):
     if 0 <= r < ROWS and 0 <= c < COLS:
         return MAP[r][c] is not None
     return False
+
+    ##
  
  
 # ─────────────────────────────────────────────
